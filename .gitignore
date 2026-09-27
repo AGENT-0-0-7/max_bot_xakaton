@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+*.sqlite3
+.pytest_cache/
+coverage.xml
+htmlcov/
+
+# Django
+backend/.coverage
+backend/db.sqlite3
+
+# Node
+frontend/node_modules/
+frontend/dist/
+package-lock.json
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
