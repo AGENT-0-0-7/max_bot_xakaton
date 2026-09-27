@@ -6,7 +6,9 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR.parent / ".env")
 
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-me")
+SECRET_KEY = os.getenv(
+    "SECRET_KEY", "dev-secret-key-change-me-very-long-32-char"
+)
 DEBUG = os.getenv("DEBUG", "True").lower() == "true"
 ALLOWED_HOSTS = os.getenv(
     "DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,0.0.0.0,testserver"
@@ -56,7 +58,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-USE_SQLITE = os.getenv("USE_SQLITE", "true").lower() == "true"
+USE_SQLITE = os.getenv("USE_SQLITE", "false").lower() == "true"
 
 if not USE_SQLITE and os.getenv("POSTGRES_DB"):
     try:

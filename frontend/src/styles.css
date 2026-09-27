@@ -14,8 +14,15 @@ body {
   background: linear-gradient(180deg, #eef2ff 0%, #f8fafc 100%);
 }
 
-button {
+button,
+input,
+textarea,
+select {
   font: inherit;
+}
+
+button {
+  cursor: pointer;
 }
 
 .app-shell {
@@ -29,6 +36,7 @@ button {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
+  gap: 16px;
 }
 
 .topbar h1 {
@@ -45,17 +53,42 @@ button {
   color: #6366f1;
 }
 
-.primary-button {
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.primary-button,
+.secondary-button,
+.filter-chip {
   border: none;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+}
+
+.primary-button {
   background: linear-gradient(135deg, #4f46e5, #4338ca);
   color: white;
-  border-radius: 12px;
-  padding: 0.8rem 1.2rem;
-  font-weight: 700;
-  cursor: pointer;
+}
+
+.secondary-button {
+  background: #e2e8f0;
+  color: #0f172a;
 }
 
 .primary-button.small { padding: 0.7rem 1rem; }
+
+.status-banner {
+  margin: 12px 0 18px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #f3f4f6;
+  border: 1px solid #e2e8f0;
+}
 
 .stats-row {
   display: grid;
@@ -66,7 +99,8 @@ button {
 
 .stat-card,
 .card-list,
-.detail-card {
+.detail-card,
+.event-form {
   background: rgba(255,255,255,0.8);
   border: 1px solid rgba(99, 102, 241, 0.15);
   border-radius: 20px;
@@ -102,6 +136,66 @@ button {
   gap: 10px;
 }
 
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter-chip {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.filter-chip.active {
+  background: #e0e7ff;
+  color: #312e81;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #475569;
+  font-size: 0.88rem;
+  padding: 0 4px;
+}
+
+.map-panel {
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid #dbeafe;
+  background: linear-gradient(135deg, #eef6ff, #f8fafc);
+}
+
+.map-surface {
+  position: relative;
+  height: 180px;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.15) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.15) 1px, transparent 1px),
+    radial-gradient(circle at center, rgba(59,130,246,0.08), rgba(59,130,246,0.02));
+  background-size: 20px 20px, 20px 20px, 100% 100%;
+}
+
+.map-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: #4f46e5;
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  box-shadow: 0 8px 16px rgba(79, 70, 229, 0.25);
+}
+
+.map-marker.selected {
+  background: #ec4899;
+}
+
 .event-card {
   width: 100%;
   background: #f8fafc;
@@ -109,7 +203,6 @@ button {
   border-radius: 16px;
   padding: 16px;
   text-align: left;
-  cursor: pointer;
 }
 
 .event-card.selected {
@@ -147,6 +240,45 @@ button {
   font-size: 0.8rem;
 }
 
+.empty-state {
+  padding: 18px 10px;
+  color: #64748b;
+  text-align: center;
+}
+
+.event-form {
+  margin-bottom: 20px;
+  padding: 20px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.event-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #475569;
+  font-size: 0.85rem;
+}
+
+.event-form input,
+.event-form textarea,
+.event-form select {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0.7rem 0.8rem;
+  background: white;
+}
+
+.full-width {
+  grid-column: 1 / -1;
+}
+
 .detail-card {
   padding: 24px;
 }
@@ -156,6 +288,7 @@ button {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
+  gap: 12px;
 }
 
 .detail-card h2 {
@@ -186,11 +319,18 @@ button {
 }
 
 @media (max-width: 900px) {
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .content-grid {
     grid-template-columns: 1fr;
   }
 
-  .stats-row {
+  .stats-row,
+  .form-grid,
+  .detail-grid {
     grid-template-columns: 1fr;
   }
 }

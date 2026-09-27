@@ -27,6 +27,9 @@ class MaxInitDataAuthTests(SimpleTestCase):
         self.assertEqual(result["id"], 1001)
         self.assertEqual(result["username"], "alice_example")
 
+    def test_docker_profile_defaults_to_postgres_when_credentials_exist(self):
+        self.assertFalse(getattr(settings, "USE_SQLITE", True))
+
     def test_jwt_can_be_generated_and_decoded(self):
         class FakeUser:
             id = 42
