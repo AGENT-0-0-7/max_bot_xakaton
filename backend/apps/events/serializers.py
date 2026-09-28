@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from django.utils import timezone
+
 from apps.events.models import Event, Registration
 from apps.users.serializers import UserSerializer
 
@@ -71,6 +73,30 @@ class EventCreateSerializer(serializers.ModelSerializer):
         validated_data['organizer'] = user
         validated_data['status'] = 'pending'
         return super().create(validated_data)
+
+    def validate(self, attrs):
+        latitude = attrs.get("latitude")
+        longitude = attrs.get("longitude")
+        start_time = attrs.get("start_time")
+        end_time = attrs.get("end_time")
+
+        if latitude is not None and not -90 <= latitude <= 90:
+            raise serializers.ValidationError(
+                {"latitude": "Latitude must be between -90 and 90."}
+            )
+        if longitude is not None and not -180 <= longitude <= 180:
+            raise serializers.ValidationError(
+                {"longitude": "Longitude must be between -180 and 180."}
+            )
+        if start_time and start_time <= timezone.now():
+            raise serializers.ValidationError(
+                {"start_time": "Start time must be in the future."}
+            )
+        if start_time and end_time and end_time <= start_time:
+            raise serializers.ValidationError(
+                {"end_time": "End time must be later than start time."}
+            )
+        return attrs
 
 
 class EventDetailSerializer(serializers.ModelSerializer):

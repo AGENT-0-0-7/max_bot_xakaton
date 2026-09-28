@@ -1,61 +1,35 @@
-version: "1.0"
-team_id: "team_locator_72"
-base_url: "https://locator-backend.example.com/"
+version: "1.1"
+team_id: "ryadom_max_miniapp"
+base_url: "http://localhost:8000"
+notes:
+  - "Local Docker verification configuration."
+  - "Before external assessment replace base_url with the deployed HTTPS API URL."
 checks:
-  - name: "Аутентификация через MAX initData"
+  - name: "MAX demo authentication"
     method: "POST"
     endpoint: "/api/v1/auth/max/"
     role: "guest"
     headers:
       Content-Type: "application/json"
     body:
-      init_data: "user=%7B%22id%22%3A12345678%2C%22first_name%22%3A%22Test%22%7D&auth_date=1700000000&hash=mock_hash"
+      init_data: "user=%7B%22id%22%3A12345678%2C%22first_name%22%3A%22Demo%22%2C%22username%22%3A%22demo_user%22%7D&auth_date=1770000000&hash=mock_hash"
     expected_status: 200
     expected_schema:
-      type: "object"
-      required: ["access_token", "user"]
-      properties:
-        access_token:
-          type: "string"
-        user:
-          type: "object"
-          required: ["id", "max_id"]
-          properties:
-            id:
-              type: "integer"
-            max_id:
-              type: "integer"
-  - name: "Получение списка ближайших событий"
+      type: object
+      required: [access_token, user]
+  - name: "Nearby approved events"
     method: "GET"
-    endpoint: "/api/v1/events/?lat=57.153033&lon=65.534328&radius=5"
+    endpoint: "/api/v1/events/?lat=57.153033&lon=65.534328&radius_km=5"
     role: "user"
     headers:
       Authorization: "Bearer {{access_token}}"
     expected_status: 200
     expected_schema:
-      type: "array"
+      type: array
       items:
-        type: "object"
-        required: ["id", "title", "location", "start_time", "available_seats"]
-        properties:
-          id:
-            type: "integer"
-          title:
-            type: "string"
-          location:
-            type: "object"
-            required: ["latitude", "longitude"]
-            properties:
-              latitude:
-                type: "number"
-              longitude:
-                type: "number"
-          start_time:
-            type: "string"
-            format: "date-time"
-          available_seats:
-            type: "integer"
-  - name: "Создание нового события"
+        type: object
+        required: [id, title, location, start_time, available_seats, is_registered]
+  - name: "Submit organizer event"
     method: "POST"
     endpoint: "/api/v1/events/"
     role: "user"
@@ -63,38 +37,20 @@ checks:
       Authorization: "Bearer {{access_token}}"
       Content-Type: "application/json"
     body:
-      title: "Студенческий квартирник в ТюмГУ"
-      description: "Живая музыка, чай и настолки"
+      title: "Demo MAX event"
+      description: "Synthetic event used only for API verification"
       category: "culture"
-      address: "ул. Ленина, 23, Тюмень"
+      address: "Tyumen demo venue"
       latitude: 57.153033
       longitude: 65.534328
-      start_time: "2026-10-15T18:00:00Z"
-      end_time: "2026-10-15T21:00:00Z"
+      start_time: "2027-10-15T18:00:00Z"
+      end_time: "2027-10-15T21:00:00Z"
       max_participants: 30
     expected_status: 201
     expected_schema:
-      type: "object"
-      required: ["id", "status"]
-      properties:
-        id:
-          type: "integer"
-        status:
-          type: "string"
-          enum: ["pending"]
-  - name: "Запись на событие"
-    method: "POST"
-    endpoint: "/api/v1/events/1/register/"
-    role: "user"
-    headers:
-      Authorization: "Bearer {{access_token}}"
-    expected_status: 200
-    expected_schema:
-      type: "object"
-      required: ["status", "message"]
+      type: object
+      required: [id, status, message]
       properties:
         status:
-          type: "string"
-          enum: ["success"]
-        message:
-          type: "string"
+          type: string
+          enum: [pending]

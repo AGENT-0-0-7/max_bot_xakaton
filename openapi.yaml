@@ -1,77 +1,61 @@
 openapi: 3.0.3
 info:
-  title: Locator Events API
-  version: 1.0.0
-  description: API for local event discovery and registrations in MAX mini app.
+  title: Ryadom Events API
+  version: 1.1.0
+  description: API for the Ryadom MAX mini-app. Demo events are synthetic and seeded locally.
 servers:
   - url: http://localhost:8000
+    description: Local Docker API
 paths:
   /api/v1/auth/max/:
     post:
-      summary: Validate MAX initData and issue JWT
+      summary: Validate MAX WebApp initData and issue a JWT
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - init_data
+              required: [init_data]
               properties:
                 init_data:
                   type: string
       responses:
         '200':
-          description: Auth success
+          description: Authenticated MAX user
           content:
             application/json:
               schema:
                 type: object
+                required: [access_token, user]
                 properties:
                   access_token:
                     type: string
                   user:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                      max_id:
-                        type: integer
-                      first_name:
-                        type: string
-                      last_name:
-                        type: string
-                      username:
-                        type: string
-        '400':
-          description: Invalid input
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Invalid, expired or altered MAX initData
   /api/v1/events/:
     get:
-      summary: List approved events near the user
+      summary: List approved future events near the user
       parameters:
-        - in: query
-          name: lat
-          schema:
-            type: number
-        - in: query
-          name: lon
-          schema:
-            type: number
-        - in: query
-          name: radius
-          schema:
-            type: number
+        - $ref: '#/components/parameters/Latitude'
+        - $ref: '#/components/parameters/Longitude'
         - in: query
           name: radius_km
           schema:
             type: number
+            minimum: 0.1
+            maximum: 100
+            default: 25
         - in: query
           name: category
           schema:
             type: string
+            enum: [sport, education, culture, party, volunteering]
       responses:
         '200':
-          description: Events list
+          description: Nearby event list
           content:
             application/json:
               schema:
@@ -79,7 +63,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/Event'
     post:
-      summary: Create new event as organizer
+      summary: Submit an event for moderation
       security:
         - bearerAuth: []
       requestBody:
@@ -90,16 +74,27 @@ paths:
               $ref: '#/components/schemas/EventCreate'
       responses:
         '201':
-          description: Event created for moderation
+          description: Event created with pending status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, status, message]
+                properties:
+                  id:
+                    type: integer
+                  status:
+                    type: string
+                    enum: [pending]
+                  message:
+                    type: string
+        '400':
+          description: Invalid location or schedule
   /api/v1/events/{id}/:
     get:
-      summary: Event detail
+      summary: Read event details
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
+        - $ref: '#/components/parameters/EventId'
       responses:
         '200':
           description: Event detail
@@ -107,72 +102,162 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Event'
+        '404':
+          description: Event is absent or not visible to the caller
   /api/v1/events/{id}/register/:
     post:
-      summary: Register user for event
+      summary: Register current user for an event
       security:
         - bearerAuth: []
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
+        - $ref: '#/components/parameters/EventId'
       responses:
         '200':
-          description: Registration success
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                  message:
-                    type: string
+          $ref: '#/components/responses/RegistrationSuccess'
+        '400':
+          description: Event is unavailable, started or full
+  /api/v1/events/{id}/registration/:
+    delete:
+      summary: Cancel current user registration before the event starts
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '200':
+          $ref: '#/components/responses/RegistrationSuccess'
+        '404':
+          description: Registration absent
+  /api/v1/events/{id}/cancel/:
+    post:
+      summary: Cancel an organizer event
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '200':
+          $ref: '#/components/responses/RegistrationSuccess'
+        '403':
+          description: Caller is not the organizer
   /api/v1/users/me/registrations/:
     get:
-      summary: List current user's registrations
+      summary: List the current user's plans
       security:
         - bearerAuth: []
       responses:
         '200':
-          description: Registration list
+          description: Registrations
           content:
             application/json:
               schema:
                 type: array
                 items:
+                  $ref: '#/components/schemas/Registration'
+  /api/v1/users/me/events/:
+    get:
+      summary: List events created by the current user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Organizer event list including moderation statuses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Event'
+  /webhooks/max/:
+    post:
+      summary: Receive a MAX bot update
+      parameters:
+        - in: header
+          name: X-Max-Webhook-Secret
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [update_type]
+              properties:
+                update_type:
+                  type: string
+                  example: bot_started
+                user:
                   type: object
                   properties:
-                    id:
+                    user_id:
                       type: integer
-                    event_id:
-                      type: integer
-                    title:
-                      type: string
-                    status:
-                      type: string
-                    address:
-                      type: string
-                    start_time:
-                      type: string
-                        format: date-time
-                    registered_at:
-                      type: string
-                        format: date-time
+      responses:
+        '200':
+          description: Update accepted
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+  parameters:
+    EventId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: integer
+    Latitude:
+      in: query
+      name: lat
+      schema:
+        type: number
+        minimum: -90
+        maximum: 90
+    Longitude:
+      in: query
+      name: lon
+      schema:
+        type: number
+        minimum: -180
+        maximum: 180
+  responses:
+    RegistrationSuccess:
+      description: Completed action
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [status, message]
+            properties:
+              status:
+                type: string
+                enum: [success]
+              message:
+                type: string
+              registration_id:
+                type: integer
   schemas:
+    User:
+      type: object
+      required: [id, max_id, first_name]
+      properties:
+        id:
+          type: integer
+        max_id:
+          type: integer
+        first_name:
+          type: string
+        last_name:
+          type: string
+          nullable: true
+        username:
+          type: string
+          nullable: true
     Location:
       type: object
-      required:
-        - latitude
-        - longitude
+      required: [latitude, longitude]
       properties:
         latitude:
           type: number
@@ -201,6 +286,7 @@ components:
           type: string
         category:
           type: string
+          enum: [sport, education, culture, party, volunteering]
         address:
           type: string
         location:
@@ -215,8 +301,16 @@ components:
           type: integer
         status:
           type: string
+          enum: [pending, approved, rejected, cancelled]
         available_seats:
           type: integer
+        registered_count:
+          type: integer
+        distance_meters:
+          type: integer
+          nullable: true
+        is_registered:
+          type: boolean
     EventCreate:
       type: object
       required:
@@ -232,10 +326,12 @@ components:
       properties:
         title:
           type: string
+          maxLength: 255
         description:
           type: string
         category:
           type: string
+          enum: [sport, education, culture, party, volunteering]
         address:
           type: string
         latitude:
@@ -250,3 +346,24 @@ components:
           format: date-time
         max_participants:
           type: integer
+          minimum: 1
+    Registration:
+      type: object
+      required: [id, event_id, title, address, start_time, registered_at]
+      properties:
+        id:
+          type: integer
+        event_id:
+          type: integer
+        title:
+          type: string
+        status:
+          type: string
+        address:
+          type: string
+        start_time:
+          type: string
+          format: date-time
+        registered_at:
+          type: string
+          format: date-time

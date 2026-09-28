@@ -137,8 +137,15 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_ALLOW_ALL_ORIGINS = True
 
-MAX_BOT_TOKEN = os.getenv("MAX_BOT_TOKEN", "mock_token")
-MAX_BOT_API_URL = os.getenv("MAX_BOT_API_URL", "https://api.max.ru/bot")
+MAX_BOT_TOKEN = os.getenv("MAX_BOT_TOKEN", "")
+MAX_BOT_API_URL = os.getenv(
+    "MAX_BOT_API_URL", "https://platform-api2.max.ru"
+).rstrip("/")
+MAX_DEMO_MODE = (
+    os.getenv("MAX_DEMO_MODE", "false").lower() == "true"
+    or MAX_BOT_TOKEN == "mock_token"
+)
+MAX_WEBHOOK_SECRET = os.getenv("MAX_WEBHOOK_SECRET", "")
 
 LOGGING = {
     "version": 1,

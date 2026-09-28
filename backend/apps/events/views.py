@@ -22,6 +22,10 @@ class EventListCreateView(APIView):
             status=EventStatus.APPROVED, start_time__gte=timezone.now()
         ).order_by("start_time")
 
+        category = request.query_params.get("category")
+        if category:
+            qs = qs.filter(category=category)
+
         lat = request.query_params.get("lat")
         lon = request.query_params.get("lon")
         radius_km = (
@@ -29,11 +33,13 @@ class EventListCreateView(APIView):
             or request.query_params.get("radius")
             or "25"
         )
-
         try:
-            radius_km = float(radius_km)
+            radius_km = min(max(float(radius_km), 0.1), 100)
         except ValueError:
-            radius_km = 25.0
+            return Response(
+                {"detail": "Invalid radius"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if lat and lon:
             try:
@@ -61,12 +67,6 @@ class EventListCreateView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request, *args, **kwargs):
-        if not request.user or request.user.is_anonymous:
-            return Response(
-                {"detail": "Authentication required"},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
-
         serializer = EventCreateSerializer(
             data=request.data, context={"request": request}
         )
@@ -74,7 +74,6 @@ class EventListCreateView(APIView):
             return Response(
                 serializer.errors, status=status.HTTP_400_BAD_REQUEST
             )
-
         event = serializer.save()
         return Response(
             {
@@ -91,6 +90,19 @@ class EventDetailView(APIView):
 
     def get(self, request, pk, *args, **kwargs):
         event = get_object_or_404(Event, pk=pk)
+        may_view_unpublished = (
+            request.user
+            and not request.user.is_anonymous
+            and (
+                request.user.is_staff
+                or event.organizer_id == request.user.id
+            )
+        )
+        if event.status != EventStatus.APPROVED and not may_view_unpublished:
+            return Response(
+                {"detail": "Event is not available"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         serializer = EventDetailSerializer(event, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -100,13 +112,11 @@ class EventRegisterView(APIView):
 
     def post(self, request, pk, *args, **kwargs):
         event = get_object_or_404(Event, pk=pk)
-
         if event.status != EventStatus.APPROVED:
             return Response(
                 {"detail": "Event is not open for registration"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
         if event.start_time <= timezone.now():
             return Response(
                 {"detail": "Event has already started"},
@@ -115,16 +125,6 @@ class EventRegisterView(APIView):
 
         with transaction.atomic():
             event_locked = Event.objects.select_for_update().get(pk=event.pk)
-            registrations_count = Registration.objects.filter(
-                event=event_locked
-            ).count()
-
-            if registrations_count >= event_locked.max_participants:
-                return Response(
-                    {"status": "error", "message": "No available seats"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
             registration, created = Registration.objects.get_or_create(
                 user=request.user, event=event_locked
             )
@@ -133,44 +133,95 @@ class EventRegisterView(APIView):
                     {
                         "status": "success",
                         "message": "You are already registered",
+                        "registration_id": registration.id,
                     },
                     status=status.HTTP_200_OK,
                 )
 
+            registrations_count = Registration.objects.filter(
+                event=event_locked
+            ).count()
+            if registrations_count > event_locked.max_participants:
+                registration.delete()
+                return Response(
+                    {"status": "error", "message": "No available seats"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         send_max_bot_message(
             request.user.max_id,
-            f'🎟️ Вы успешно записались на событие "{event.title}". \nАдрес: {event.address}\nВремя: {event.start_time.strftime("%d.%m.%Y %H:%M")}',
+            'Вы записаны на «{}».\nАдрес: {}\nНачало: {}'.format(
+                event.title,
+                event.address,
+                event.start_time.strftime("%d.%m.%Y %H:%M"),
+            ),
         )
-
         return Response(
             {
                 "status": "success",
-                "message": "You have successfully registered",
+                "message": "Registration confirmed",
+                "registration_id": registration.id,
             },
             status=status.HTTP_200_OK,
         )
 
 
-class UserRegistrationsView(APIView):
+class EventRegistrationView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, pk, *args, **kwargs):
+        event = get_object_or_404(Event, pk=pk)
+        if event.start_time <= timezone.now():
+            return Response(
+                {"detail": "Registration can no longer be cancelled"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        registration = Registration.objects.filter(
+            user=request.user, event=event
+        ).first()
+        if not registration:
+            return Response(
+                {"detail": "Registration not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        registration.delete()
+        return Response(
+            {"status": "success", "message": "Registration cancelled"},
+            status=status.HTTP_200_OK,
+        )
+
+
+class OrganizerEventsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        registrations = (
-            Registration.objects.filter(user=request.user)
-            .select_related("event")
-            .order_by("-registered_at")
+        events = Event.objects.filter(organizer=request.user).order_by(
+            "-created_at"
         )
-        data = []
-        for registration in registrations:
-            data.append(
-                {
-                    "id": registration.id,
-                    "event_id": registration.event.id,
-                    "title": registration.event.title,
-                    "status": registration.event.status,
-                    "address": registration.event.address,
-                    "start_time": registration.event.start_time,
-                    "registered_at": registration.registered_at,
-                }
+        serializer = EventListSerializer(
+            events, many=True, context={"request": request}
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class EventCancelView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk, *args, **kwargs):
+        event = get_object_or_404(Event, pk=pk)
+        if event.organizer_id != request.user.id and not request.user.is_staff:
+            return Response(
+                {"detail": "Only the organizer can cancel the event"},
+                status=status.HTTP_403_FORBIDDEN,
             )
-        return Response(data, status=status.HTTP_200_OK)
+        if event.start_time <= timezone.now():
+            return Response(
+                {"detail": "Started events cannot be cancelled"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        event.status = EventStatus.CANCELLED
+        event.save(update_fields=["status"])
+        return Response(
+            {"status": "success", "message": "Event cancelled"},
+            status=status.HTTP_200_OK,
+        )
