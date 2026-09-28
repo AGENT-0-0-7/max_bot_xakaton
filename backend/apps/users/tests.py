@@ -29,6 +29,13 @@ class MaxInitDataAuthTests(SimpleTestCase):
         self.assertEqual(result["id"], 1001)
         self.assertEqual(result["username"], "alice_example")
 
+    @override_settings(MAX_DEMO_MODE=False)
+    def test_mock_init_data_is_rejected_outside_demo_mode(self):
+        result = validate_max_init_data(
+            "user=%7B%22id%22%3A1001%7D&hash=mock_hash"
+        )
+        self.assertIsNone(result)
+
     @override_settings(MAX_DEMO_MODE=False, MAX_BOT_TOKEN="test-token")
     def test_fresh_signed_max_init_data_is_valid(self):
         payload = {

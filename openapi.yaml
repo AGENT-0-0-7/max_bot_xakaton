@@ -238,6 +238,8 @@ components:
                 type: string
               registration_id:
                 type: integer
+              notification_sent:
+                type: boolean
   schemas:
     User:
       type: object

@@ -34,13 +34,23 @@ class EventListCreateView(APIView):
             or "25"
         )
         try:
-            radius_km = min(max(float(radius_km), 0.1), 100)
+            radius_km = float(radius_km)
         except ValueError:
             return Response(
                 {"detail": "Invalid radius"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if not 0.1 <= radius_km <= 100:
+            return Response(
+                {"detail": "Radius must be between 0.1 and 100 km"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
+        if bool(lat) != bool(lon):
+            return Response(
+                {"detail": "Both latitude and longitude are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if lat and lon:
             try:
                 lat = float(lat)
@@ -48,6 +58,11 @@ class EventListCreateView(APIView):
             except ValueError:
                 return Response(
                     {"detail": "Invalid coordinates"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if not -90 <= lat <= 90 or not -180 <= lon <= 180:
+                return Response(
+                    {"detail": "Coordinates are outside valid ranges"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -112,19 +127,19 @@ class EventRegisterView(APIView):
 
     def post(self, request, pk, *args, **kwargs):
         event = get_object_or_404(Event, pk=pk)
-        if event.status != EventStatus.APPROVED:
-            return Response(
-                {"detail": "Event is not open for registration"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if event.start_time <= timezone.now():
-            return Response(
-                {"detail": "Event has already started"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         with transaction.atomic():
             event_locked = Event.objects.select_for_update().get(pk=event.pk)
+            if event_locked.status != EventStatus.APPROVED:
+                return Response(
+                    {"detail": "Event is not open for registration"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if event_locked.start_time <= timezone.now():
+                return Response(
+                    {"detail": "Event has already started"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             registration, created = Registration.objects.get_or_create(
                 user=request.user, event=event_locked
             )
@@ -148,7 +163,7 @@ class EventRegisterView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        send_max_bot_message(
+        notification_sent = send_max_bot_message(
             request.user.max_id,
             'Вы записаны на «{}».\nАдрес: {}\nНачало: {}'.format(
                 event.title,
@@ -159,8 +174,13 @@ class EventRegisterView(APIView):
         return Response(
             {
                 "status": "success",
-                "message": "Registration confirmed",
+                "message": (
+                    "Registration confirmed"
+                    if notification_sent
+                    else "Registration confirmed; MAX notification is unavailable"
+                ),
                 "registration_id": registration.id,
+                "notification_sent": notification_sent,
             },
             status=status.HTTP_200_OK,
         )

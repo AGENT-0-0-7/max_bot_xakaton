@@ -16,7 +16,7 @@ def send_max_bot_message(max_id: int, text: str) -> bool:
 
     if settings.MAX_DEMO_MODE:
         logger.info("[DEMO MAX BOT] To max_id=%s: %s", max_id, text)
-        return True
+        return False
 
     if not settings.MAX_BOT_TOKEN:
         logger.warning("MAX notification skipped: token is absent")

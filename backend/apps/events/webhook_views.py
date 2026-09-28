@@ -23,7 +23,7 @@ class MaxWebhookView(APIView):
 
     def post(self, request, *args, **kwargs):
         expected_secret = settings.MAX_WEBHOOK_SECRET
-        supplied_secret = request.headers.get("X-Max-Webhook-Secret")
+        supplied_secret = request.headers.get("X-Max-Bot-Api-Secret")
         if expected_secret and supplied_secret != expected_secret:
             return Response(
                 {"detail": "Invalid webhook secret"},

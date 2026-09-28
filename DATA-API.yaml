@@ -1,6 +1,6 @@
 version: "1.1"
 team_id: "ryadom_max_miniapp"
-base_url: "http://localhost:8000"
+base_url: "http://localhost:8100"
 notes:
   - "Local Docker verification configuration."
   - "Before external assessment replace base_url with the deployed HTTPS API URL."

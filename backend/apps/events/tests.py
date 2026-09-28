@@ -1,6 +1,10 @@
 from datetime import timedelta
+from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
+from django.core.management.base import CommandError
+from django.test import override_settings
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -56,6 +60,7 @@ class EventApiTests(APITestCase):
         )
 
         self.assertEqual(first.status_code, status.HTTP_200_OK)
+        self.assertFalse(first.data["notification_sent"])
         self.assertEqual(second.status_code, status.HTTP_200_OK)
         self.assertEqual(second.data["message"], "You are already registered")
         self.assertEqual(cancelled.status_code, status.HTTP_200_OK)
@@ -126,3 +131,57 @@ class EventApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("end_time", response.data)
+
+    def test_webhook_checks_official_max_secret_header(self):
+        body = {"update_type": "message_created"}
+        with override_settings(MAX_WEBHOOK_SECRET="secret_12345"):
+            denied = self.client.post("/webhooks/max/", body, format="json")
+            accepted = self.client.post(
+                "/webhooks/max/",
+                body,
+                format="json",
+                HTTP_X_MAX_BOT_API_SECRET="secret_12345",
+            )
+
+        self.assertEqual(denied.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(accepted.status_code, status.HTTP_200_OK)
+
+    @override_settings(
+        MAX_DEMO_MODE=False,
+        MAX_BOT_TOKEN="test-token",
+        MAX_BOT_API_URL="https://platform-api2.max.ru",
+        MAX_WEBHOOK_URL="https://events.example.com/webhooks/max/",
+        MAX_WEBHOOK_SECRET="webhook_secret_123",
+    )
+    @patch("apps.events.management.commands.setup_max_webhook.requests.post")
+    def test_webhook_setup_uses_official_subscription_contract(self, post):
+        response = Mock()
+        response.json.return_value = {"success": True}
+        post.return_value = response
+
+        call_command("setup_max_webhook")
+
+        post.assert_called_once_with(
+            "https://platform-api2.max.ru/subscriptions",
+            headers={
+                "Authorization": "test-token",
+                "Content-Type": "application/json",
+            },
+            json={
+                "url": "https://events.example.com/webhooks/max/",
+                "update_types": ["bot_started"],
+                "secret": "webhook_secret_123",
+            },
+            timeout=15,
+        )
+        response.raise_for_status.assert_called_once_with()
+
+    @override_settings(
+        MAX_DEMO_MODE=False,
+        MAX_BOT_TOKEN="test-token",
+        MAX_WEBHOOK_URL="http://events.example.com/webhooks/max/",
+        MAX_WEBHOOK_SECRET="webhook_secret_123",
+    )
+    def test_webhook_setup_rejects_non_https_url(self):
+        with self.assertRaises(CommandError):
+            call_command("setup_max_webhook")

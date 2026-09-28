@@ -60,42 +60,23 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 USE_SQLITE = os.getenv("USE_SQLITE", "false").lower() == "true"
 
-if not USE_SQLITE and os.getenv("POSTGRES_DB"):
-    try:
-        import psycopg2
-
-        conn = psycopg2.connect(
-            dbname=os.getenv("POSTGRES_DB", "locator_db"),
-            user=os.getenv("POSTGRES_USER", "postgres"),
-            password=os.getenv("POSTGRES_PASSWORD", "postgres_password"),
-            host=os.getenv("POSTGRES_HOST", "db"),
-            port=os.getenv("POSTGRES_PORT", "5432"),
-        )
-        conn.close()
-        DATABASES = {
-            "default": {
-                "ENGINE": "django.db.backends.postgresql",
-                "NAME": os.getenv("POSTGRES_DB", "locator_db"),
-                "USER": os.getenv("POSTGRES_USER", "postgres"),
-                "PASSWORD": os.getenv(
-                    "POSTGRES_PASSWORD", "postgres_password"
-                ),
-                "HOST": os.getenv("POSTGRES_HOST", "db"),
-                "PORT": os.getenv("POSTGRES_PORT", "5432"),
-            }
-        }
-    except Exception:
-        DATABASES = {
-            "default": {
-                "ENGINE": "django.db.backends.sqlite3",
-                "NAME": BASE_DIR / "db.sqlite3",
-            }
-        }
-else:
+if USE_SQLITE or not os.getenv("POSTGRES_DB"):
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.getenv("POSTGRES_DB", "locator_db"),
+            "USER": os.getenv("POSTGRES_USER", "postgres"),
+            "PASSWORD": os.getenv("POSTGRES_PASSWORD", ""),
+            "HOST": os.getenv("POSTGRES_HOST", "db"),
+            "PORT": os.getenv("POSTGRES_PORT", "5432"),
+            "CONN_MAX_AGE": 60,
         }
     }
 
@@ -130,22 +111,21 @@ REST_FRAMEWORK = {
 }
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:80",
-    "http://127.0.0.1:80",
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173",
+    ).split(",")
+    if origin.strip()
 ]
-CORS_ALLOW_ALL_ORIGINS = True
 
-MAX_BOT_TOKEN = os.getenv("MAX_BOT_TOKEN", "")
+MAX_BOT_TOKEN = os.getenv("MAX_BOT_TOKEN", "").strip()
 MAX_BOT_API_URL = os.getenv(
     "MAX_BOT_API_URL", "https://platform-api2.max.ru"
 ).rstrip("/")
-MAX_DEMO_MODE = (
-    os.getenv("MAX_DEMO_MODE", "false").lower() == "true"
-    or MAX_BOT_TOKEN == "mock_token"
-)
-MAX_WEBHOOK_SECRET = os.getenv("MAX_WEBHOOK_SECRET", "")
+MAX_DEMO_MODE = os.getenv("MAX_DEMO_MODE", "false").lower() == "true"
+MAX_WEBHOOK_SECRET = os.getenv("MAX_WEBHOOK_SECRET", "").strip()
+MAX_WEBHOOK_URL = os.getenv("MAX_WEBHOOK_URL", "").strip()
 
 LOGGING = {
     "version": 1,

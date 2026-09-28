@@ -2,11 +2,11 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   getMaxContext,
-  prepareMaxApp,
   shareInMax,
 } from './maxBridge';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 const DEFAULT_COORDS = { latitude: 57.153033, longitude: 65.534328 };
 
 const CATEGORIES = {
@@ -96,8 +96,20 @@ const api = async (path, options = {}) => {
 };
 
 const demoInitData = () => {
+  let demoId = null;
+  try {
+    demoId = window.localStorage.getItem('ryadom_demo_user_id');
+    if (!demoId || !/^\d+$/.test(demoId)) {
+      const random = new Uint32Array(1);
+      window.crypto.getRandomValues(random);
+      demoId = String(900000 + (random[0] % 1000000000));
+      window.localStorage.setItem('ryadom_demo_user_id', demoId);
+    }
+  } catch {
+    demoId = String(900000 + (Date.now() % 1000000000));
+  }
   const user = {
-    id: 900001,
+    id: Number(demoId),
     first_name: 'Гость',
     last_name: 'Демо',
     username: 'max_demo_user',
@@ -201,7 +213,7 @@ function EventDetails({
         <div className="registered-action">
           <div>
             <strong>Вы записаны</strong>
-            <span>Подтверждение придёт в чат с ботом MAX.</span>
+            <span>Запись сохранена в личном кабинете.</span>
           </div>
           <button
             className="text-button danger"
@@ -425,9 +437,17 @@ export default function App() {
 
   useEffect(() => {
     const bootstrap = async () => {
-      prepareMaxApp();
       const context = getMaxContext();
       setMaxContext(context);
+      if (!context.initData && (context.isMax || !DEMO_MODE)) {
+        setNotice({
+          type: 'error',
+          text: context.isMax
+            ? 'MAX не передал данные запуска. Закройте мини-приложение и откройте его снова из чата с ботом.'
+            : 'Демо-вход выключен. Запустите стенд через Docker в демо-режиме или откройте приложение из MAX.',
+        });
+        return;
+      }
       try {
         const data = await api('/api/v1/auth/max/', {
           method: 'POST',
@@ -507,13 +527,15 @@ export default function App() {
     }
     setIsActionBusy(true);
     try {
-      await api('/api/v1/events/' + selectedEvent.id + '/register/', {
+      const result = await api('/api/v1/events/' + selectedEvent.id + '/register/', {
         method: 'POST',
         headers: authHeaders(authToken),
       });
       setNotice({
         type: 'success',
-        text: 'Готово! Вы записаны, а подтверждение отправлено в чат с ботом MAX.',
+        text: result.notification_sent
+          ? 'Готово! Вы записаны, подтверждение отправлено в чат с ботом MAX.'
+          : 'Вы записаны. Уведомление MAX недоступно; событие сохранено в «Мои планы».',
       });
       await Promise.all([refreshEvents(), refreshAccount()]);
     } catch (error) {
@@ -669,7 +691,7 @@ export default function App() {
         </div>
       </header>
 
-      {!maxContext.isMax && (
+      {!maxContext.isMax && DEMO_MODE && (
         <div className="demo-banner">
           <span>Демо-режим</span>
           <p>Вы открыли стенд в браузере. В MAX вход и уведомления подтверждаются настоящими данными Bridge.</p>

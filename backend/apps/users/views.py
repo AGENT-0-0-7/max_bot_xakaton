@@ -36,9 +36,11 @@ class MaxAuthView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        first_name = user_data.get("first_name", "MAX User")
+        first_name = user_data.get("first_name") or "MAX User"
         last_name = user_data.get("last_name", "")
         username = user_data.get("username") or f"max_user_{max_id}"
+        if User.objects.exclude(max_id=max_id).filter(username=username).exists():
+            username = f"max_user_{max_id}"
 
         user, created = User.objects.get_or_create(
             max_id=max_id,
@@ -52,6 +54,8 @@ class MaxAuthView(APIView):
         if not created:
             user.first_name = first_name
             user.last_name = last_name
+            if user.username != username:
+                user.username = username
             user.save()
 
         jwt_token = generate_jwt_for_user(user)

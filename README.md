@@ -49,11 +49,12 @@ Frontend использует тот же origin, что и API в Docker, по�
 ## Быстрый локальный запуск
 
 1. Скопируйте .env.example в .env. Для демонстрации оставьте MAX_DEMO_MODE=true; рабочий токен не требуется.
+Подробная инструкция для Windows, демонстрация сценариев, проверка API, журналы, остановка и подключение настоящего бота описаны в [инструкции по запуску](ИНСТРУКЦИЯ_ПО_ЗАПУСКУ.md).
 2. Запустите все компоненты одной командой:
 
     docker compose up --build
 
-3. Откройте http://localhost. API доступно на http://localhost:8000, админ-панель — http://localhost:8000/admin/.
+3. Откройте http://localhost:8080. API доступно напрямую на http://localhost:8100, админ-панель — http://localhost:8080/admin/.
 
 Первый старт применит миграции и загрузит демонстрационные данные. Тестовый модератор: admin / admin_pass. Это только локальная учётная запись из seed-данных, не используйте её в публичном окружении.
 
@@ -76,7 +77,9 @@ Frontend использует тот же origin, что и API в Docker, по�
 | MAX_BOT_API_URL | https://platform-api2.max.ru |
 | MAX_DEMO_MODE | true разрешает только явно помеченный mock-вход и отключает внешние уведомления |
 | MAX_WEBHOOK_SECRET | необязательный секрет, проверяемый на webhook endpoint |
+| MAX_WEBHOOK_URL | публичный HTTPS адрес webhook для регистрации подписки MAX |
 | POSTGRES_* | параметры базы данных Docker |
+| VITE_DEMO_MODE | разрешить браузерную демонстрацию локального стенда |
 | VITE_API_BASE_URL | HTTPS URL API для отдельного размещения фронтенда; по умолчанию используется same-origin /api |
 
 Не добавляйте настоящий токен бота, webhook secret или production SECRET_KEY в git.
@@ -90,23 +93,18 @@ Seed-данные — заранее подготовленная синтети
 - браузерный код подключает https://st.max.ru/js/max-web-app.js;
 - MAX Bridge отдаёт window.WebApp.initData, а сервер проверяет его HMAC-подпись;
 - после подтверждения записи Django делает POST /messages?user_id=... в platform-api2.max.ru;
-- production webhook указывает на https://<ваш-домен>/webhooks/max/.
+- production webhook указывает на https://<ваш-домен>/webhooks/max/ и проверяет заголовок X-Max-Bot-Api-Secret.
 
 ## Порядок проверки
 
 1. Выполните docker compose up --build.
-2. Откройте http://localhost. Браузер показывает фиолетовую плашку «Демо-режим» — это ожидаемо.
+2. Откройте http://localhost:8080. Браузер показывает фиолетовую плашку «Демо-режим» — это ожидаемо.
 3. Выберите «Ближайшие события», откройте карточку и нажмите «Записаться».
 4. Убедитесь, что кнопка меняется на «Вы записаны», а событие появляется в «Мои планы».
 5. Нажмите «Отменить» и убедитесь, что запись исчезает, а остаток мест обновляется.
 6. Откройте «Организую» → «Добавить событие», заполните форму. Новое событие получает статус «На модерации».
 7. Войдите в Django Admin как admin, переведите событие в approved. Обновите ленту — событие появится среди доступных.
-8. Для проверки API выполните:
-
-    cd backend
-    set USE_SQLITE=true
-    set MAX_DEMO_MODE=true
-    ..\.venv\Scripts\python.exe manage.py test
+8. Для автоматической проверки API выполните команды из инструкции по запуску.
 
 ## API
 
@@ -130,10 +128,12 @@ Seed-данные — заранее подготовленная синтети
 1. Создать и пройти модерацию бота в MAX для бизнеса, получить токен и поместить его только в защищённое окружение.
 2. Разместить frontend и backend по HTTPS на домене с валидным сертификатом.
 3. В настройках бота указать HTTPS URL мини-приложения и кнопку запуска.
-4. Зарегистрировать HTTPS webhook в MAX на /webhooks/max/.
+4. Задать HTTPS адрес webhook и секрет в окружении, затем зарегистрировать подписку командой docker compose exec backend python manage.py setup_max_webhook.
 5. Заменить base_url в DATA-API.yaml на публичный HTTPS адрес API.
 
 После этого основной сценарий будет проходиться внутри чат-бота MAX без демо-режима.
+
+Перед настройкой сверьтесь с [документацией MAX Bridge](https://dev.max.ru/docs/webapps/bridge), [подключением мини-приложения](https://dev.max.ru/docs/webapps/introduction), [проверкой initData](https://dev.max.ru/docs/webapps/validation), [методом отправки сообщений](https://dev.max.ru/docs-api/methods/POST/messages) и [подпиской Webhook](https://dev.max.ru/docs-api/methods/POST/subscriptions). Названия методов, заголовок webhook и требования к HTTPS проверены по официальной документации на 28 сентября 2026 года.
 
 ## Ограничения MVP и развитие
 

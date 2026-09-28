@@ -9,7 +9,10 @@ __pycache__/
 venv/
 node_modules/
 frontend/node_modules/
-backend/.pytest_cache/
+frontend/dist/
 backend/db.sqlite3
 backend/.coverage
+backend/.pytest_cache/
+tmp/
+*.log
 **/.DS_Store

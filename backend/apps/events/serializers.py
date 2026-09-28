@@ -1,3 +1,5 @@
+import math
+
 from rest_framework import serializers
 from django.utils import timezone
 
@@ -80,11 +82,15 @@ class EventCreateSerializer(serializers.ModelSerializer):
         start_time = attrs.get("start_time")
         end_time = attrs.get("end_time")
 
-        if latitude is not None and not -90 <= latitude <= 90:
+        if latitude is not None and (
+            not math.isfinite(latitude) or not -90 <= latitude <= 90
+        ):
             raise serializers.ValidationError(
                 {"latitude": "Latitude must be between -90 and 90."}
             )
-        if longitude is not None and not -180 <= longitude <= 180:
+        if longitude is not None and (
+            not math.isfinite(longitude) or not -180 <= longitude <= 180
+        ):
             raise serializers.ValidationError(
                 {"longitude": "Longitude must be between -180 and 180."}
             )

@@ -26,21 +26,6 @@ export const getMaxContext = () => {
   };
 };
 
-export const prepareMaxApp = () => {
-  const app = getWebApp();
-  if (!app) {
-    return;
-  }
-
-  try {
-    app.ready?.();
-    app.expand?.();
-    app.disableVerticalSwipes?.();
-  } catch (error) {
-    console.warn('MAX Bridge is available but could not prepare the view.', error);
-  }
-};
-
 export const shareInMax = async (text) => {
   const app = getWebApp();
   const url = 'https://max.ru/:share?text=' + encodeURIComponent(text);
